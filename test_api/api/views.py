@@ -59,7 +59,7 @@ class LogOutSession(APIView):
 class UserProfileViewSet(ModelViewSet):
     queryset = User.objects.all()
     serializer_class = ProfileSerializer
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['username']
 
@@ -87,15 +87,88 @@ class RelationsViewSet(UpdateModelMixin, GenericViewSet, CreateModelMixin):
 class ChatViewSet(ModelViewSet):
     queryset = Chat.objects.all()
     serializer_class = ChatSerializer
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        username = self.request.query_params.get('user')
+        if username:
+            try:
+                user = User.objects.get(username=username)
+                user_id = user.id
+                queryset = queryset.filter(user1=user_id) | queryset.filter(user2=user_id)
+            except User.DoesNotExist:
+                queryset = queryset.none()
+        return queryset
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        username = self.request.query_params.get('user')
+        modified_data = []
+        for chat in serializer.data:
+            user1 = User.objects.get(id=chat['user1']).username
+            user2 = User.objects.get(id=chat['user2']).username
+            chat_data = {
+                'id': chat['id'],
+                'user': user1 if username != username else user2,
+            }
+            modified_data.append(chat_data)
+
+        return Response(modified_data)
 
 
 class MessageViewSet(ModelViewSet):
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['chat']
+
+    def create(self, request, *args, **kwargs):
+        # Получаем имя пользователя из данных запроса
+        username = request.data.get('sender')
+        
+        # Получаем объект пользователя по имени
+        user = User.objects.get(username=username)
+        
+        # Заменяем имя пользователя на его id в данных
+        request.data['sender'] = user.id
+        
+        # Удаляем имя пользователя из данных, если оно больше не нужно
+        # request.data.pop('sender', None)
+        
+        # Создаем запись в базе данных
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        chat_data = {
+                'id': serializer.data['id'],
+                'chat': serializer.data['chat'],
+                'sender': User.objects.get(id=serializer.data['sender']).username,
+                'text': serializer.data['text'],
+                'created_at': serializer.data['created_at']
+            }
+        return Response(chat_data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        modified_data = []
+
+        for message in serializer.data:
+            chat_data = {
+                'id': message['id'],
+                'chat': message['chat'],
+                'sender': User.objects.get(id=message['sender']).username,
+                'text': message['text'],
+                'created_at': message['created_at']
+            }
+            modified_data.append(chat_data)
+        return Response(modified_data)
 
 
 

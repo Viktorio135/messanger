@@ -9,6 +9,7 @@ function Navbar() {
       <ul className="navbar-links">
         <li><Link to="/home">Главная</Link></li>
         <li><Link to="/profile">Профиль</Link></li>
+        <li><Link to="/chats">Чаты</Link></li> {/* Добавляем ссылку на чаты */}
         <li><Link to="/logout">Выход</Link></li>
       </ul>
     </nav>

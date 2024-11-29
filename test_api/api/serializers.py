@@ -60,16 +60,22 @@ class ChatSerializer(serializers.ModelSerializer):
     user1 = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     user2 = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
 
+
     class Meta:
         model = Chat
         fields = ('id', 'user1', 'user2')
 
 
 
+
 class MessageSerializer(serializers.ModelSerializer):
+
+
     class Meta:
         model = Message
-        fields = ('id', 'chat', 'sender', 'text', 'created_at') 
+        fields = ('id', 'chat', 'sender', 'text', 'created_at')
+
+    
 
 
 class ProfileSerializer(serializers.ModelSerializer):

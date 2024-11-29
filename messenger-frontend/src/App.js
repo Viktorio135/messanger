@@ -5,6 +5,7 @@ import Register from './components/Register.js';
 import Home from './components/Home.js';
 import Logout from './components/Logout.js';
 import Profile from './components/Profile.js';
+import Chats from './components/Chats.js'; // Добавляем импорт
 import Navbar from './components/Navbar.js';
 import './App.css';
 
@@ -20,6 +21,7 @@ function App() {
             <Route path="/home" element={<Home />} />
             <Route path="/registration" element={<Register />} />
             <Route path="/logout" element={<Logout />} />
+            <Route path="/chats" element={<Chats />} /> {/* Добавляем маршрут для чатов */}
           </Routes>
         </div>
       </div>
