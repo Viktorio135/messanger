@@ -1,13 +1,19 @@
+import json
+import time
+
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework.mixins import UpdateModelMixin, CreateModelMixin
 from rest_framework.response import Response
+from django.http import StreamingHttpResponse
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
-from django.contrib.auth import authenticate, login, logout
-from django.middleware.csrf import get_token
+from rest_framework.permissions import IsAuthenticated
+from django.contrib.auth import authenticate, login
+from django.shortcuts import get_object_or_404
+from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework_simplejwt.tokens import RefreshToken
+
 
 
 
@@ -111,7 +117,7 @@ class ChatViewSet(ModelViewSet):
             user2 = User.objects.get(id=chat['user2']).username
             chat_data = {
                 'id': chat['id'],
-                'user': user1 if username != username else user2,
+                'user': user1 if username == user2 else user2,
             }
             modified_data.append(chat_data)
 
@@ -126,33 +132,21 @@ class MessageViewSet(ModelViewSet):
     filterset_fields = ['chat']
 
     def create(self, request, *args, **kwargs):
-        # Получаем имя пользователя из данных запроса
         username = request.data.get('sender')
-        
-        # Получаем объект пользователя по имени
         user = User.objects.get(username=username)
-        
-        # Заменяем имя пользователя на его id в данных
         request.data['sender'] = user.id
-        
-        # Удаляем имя пользователя из данных, если оно больше не нужно
-        # request.data.pop('sender', None)
-        
-        # Создаем запись в базе данных
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         chat_data = {
-                'id': serializer.data['id'],
-                'chat': serializer.data['chat'],
-                'sender': User.objects.get(id=serializer.data['sender']).username,
-                'text': serializer.data['text'],
-                'created_at': serializer.data['created_at']
-            }
+            'id': serializer.data['id'],
+            'chat': serializer.data['chat'],
+            'sender': User.objects.get(id=serializer.data['sender']).username,
+            'text': serializer.data['text'],
+            'created_at': serializer.data['created_at']
+        }
         return Response(chat_data, status=status.HTTP_201_CREATED, headers=headers)
-
-
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -169,8 +163,31 @@ class MessageViewSet(ModelViewSet):
             }
             modified_data.append(chat_data)
         return Response(modified_data)
+    
+    @action(detail=False, methods=['get'], url_path=r'sse_messages/(?P<chat_id>\d+)', renderer_classes=[TextEventStreamRenderer])
+    def sse_messages(self, request, chat_id):
+        chat = get_object_or_404(Chat, id=chat_id)
+        last_message_id = request.GET.get('last_message_id', None)
+        try:
+            last_message_id = int(last_message_id) if last_message_id else 0
+        except ValueError:
+            last_message_id = 0
 
+        def event_stream():
+            nonlocal last_message_id
+            while True:
+                messages = Message.objects.filter(chat=chat, id__gt=last_message_id).order_by('id')
+                if messages.exists():
+                    for msg in messages:
+                        serializer = MessageSerializer(msg)
+                        data = serializer.data
+                        data['sender'] = msg.sender.username
+                        yield f"data: {json.dumps(data)}\n\n"
+                        last_message_id = msg.id
+                time.sleep(1)
 
+        response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+        return response
 
 
 

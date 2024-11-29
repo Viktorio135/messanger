@@ -1,6 +1,16 @@
 from .models import User
+from rest_framework.renderers import BaseRenderer
 from .models import Post, UserPostRelation, Chat, Message
 from rest_framework import serializers
+
+
+class TextEventStreamRenderer(BaseRenderer):
+    media_type = 'text/event-stream'
+    format = 'text'
+    charset = 'utf-8'
+
+    def render(self, data, media_type=None, renderer_context=None):
+        return data
 
 
 class UserSerializer(serializers.ModelSerializer):
