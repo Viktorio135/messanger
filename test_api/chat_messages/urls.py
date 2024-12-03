@@ -5,17 +5,13 @@ from rest_framework_simplejwt import views as jwt_views
 
 from .views import *
 
-app_name = 'api'
+app_name = 'messages'
 
 router = DefaultRouter()
-router.register(r'posts', PostViewSet)
-router.register(r'relations', RelationsViewSet)
-
+router.register(r'chat', ChatViewSet)
+router.register(r'message', MessageViewSet)
 
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('accounts/', include('accounts.urls')),
-    path('messages/', include('chat_messages.urls'),)
-
 ]

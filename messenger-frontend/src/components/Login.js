@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axiosInstance from './axiosConfig';
 import './Login.css'
+
+
+
+
 function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -18,7 +22,7 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axiosInstance.post('/api/token/', {
+      const response = await axiosInstance.post('/api/accounts/token/', {
         username,
         password,
       });

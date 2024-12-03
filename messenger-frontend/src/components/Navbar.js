@@ -7,8 +7,9 @@ function Navbar() {
     <nav className="navbar">
       <div className="navbar-logo">Мессенджер</div>
       <ul className="navbar-links">
-        <li><Link to="/home">Главная</Link></li>
+        <li><Link to="/posts">Посты</Link></li>
         <li><Link to="/profile">Профиль</Link></li>
+        <li><Link to="/contacts">Контакты</Link></li>
         <li><Link to="/chats">Чаты</Link></li> {/* Добавляем ссылку на чаты */}
         <li><Link to="/logout">Выход</Link></li>
       </ul>

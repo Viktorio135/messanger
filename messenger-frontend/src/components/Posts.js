@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from './axiosConfig';
 
-function Home() {
+function Posts() {
     const navigate = useNavigate();
     const [postsData, setPostsData] = useState([]);
 
@@ -36,4 +36,4 @@ function Home() {
     );
 }
 
-export default Home;
+export default Posts;

@@ -15,7 +15,7 @@ function Logout() {
     e.preventDefault();
 
     try {
-      const response = await axiosInstance.post('/api/logout/', {"refresh_token": localStorage.getItem("refreshToken")});
+      const response = await axiosInstance.post('/api/accounts/logout/', {"refresh_token": localStorage.getItem("refreshToken")});
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('username');

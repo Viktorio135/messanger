@@ -37,7 +37,7 @@ function Register() {
         data.append('avatar', formData.avatar);
       }
 
-      const response = await axiosInstance.post('/api/registration/', data, {
+      const response = await axiosInstance.post('/api/accounts/registration/', data, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -55,7 +55,7 @@ function Register() {
   useEffect(() => {
     const accessToken = localStorage.getItem('accessToken');
     if (accessToken) {
-      navigate('/home');
+      navigate('/profile');
     }
   }, [navigate]);
 

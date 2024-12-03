@@ -1,10 +1,14 @@
+
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axiosInstance from './axiosConfig';
 import '../App.css';
+import './Chats.css';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 
 function Chats() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -17,8 +21,17 @@ function Chats() {
     const fetchChats = async () => {
       try {
         const username = localStorage.getItem('username');
-        const response = await axiosInstance.get(`/api/chat/?user=${username}`);
+        const response = await axiosInstance.get(`/api/messages/chat/?user=${username}`);
         setChats(response.data);
+
+        // Проверяем, есть ли параметр user в URL и выбираем соответствующий чат
+        const userParam = searchParams.get('username');
+        if (userParam) {
+          const chat = response.data.find(chat => chat.user === userParam);
+          if (chat) {
+            setSelectedChat(chat);
+          }
+        }
       } catch (error) {
         console.error('Error fetching chats:', error);
         navigate('/login');
@@ -26,13 +39,13 @@ function Chats() {
     };
 
     fetchChats();
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   useEffect(() => {
     const fetchMessages = async () => {
       if (selectedChat) {
         try {
-          const response = await axiosInstance.get(`/api/message/?chat=${selectedChat.id}`);
+          const response = await axiosInstance.get(`/api/messages/message/?chat=${selectedChat.id}`);
           setMessages(response.data);
           if (response.data.length > 0) {
             setLastMessageId(response.data[response.data.length - 1].id);
@@ -48,16 +61,34 @@ function Chats() {
 
   useEffect(() => {
     if (selectedChat) {
-      const eventSource = new EventSource(`http://localhost:8000/api/message/sse_messages/${selectedChat.id}/?last_message_id=${lastMessageId}`);
+      const accessToken = localStorage.getItem('accessToken');
+      const url = `http://localhost:8000/api/messages/message/sse_messages/${selectedChat.id}/?last_message_id=${lastMessageId}`;
 
-      eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        setMessages((prevMessages) => [...prevMessages, data]);
-        setLastMessageId(data.id);
+      const controller = new AbortController();
+
+      const fetchSSE = async () => {
+        try {
+          await fetchEventSource(url, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`
+            },
+            onmessage: (event) => {
+              const data = JSON.parse(event.data);
+              setMessages((prevMessages) => [...prevMessages, data]);
+              setLastMessageId(data.id);
+            },
+            signal: controller.signal,
+          });
+        } catch (error) {
+          console.error('Error with SSE connection:', error);
+        }
       };
 
+      fetchSSE();
+
       return () => {
-        eventSource.close();
+        controller.abort();
       };
     }
   }, [selectedChat, lastMessageId]);
@@ -70,7 +101,10 @@ function Chats() {
   }, [messages]);
 
   const handleChatSelect = (chat) => {
-    setSelectedChat(chat);
+    if (selectedChat?.id !== chat.id) {
+      setSelectedChat(chat);
+      setMessages([]); // Очищаем сообщения только при выборе нового чата
+    }
     // Scroll to bottom when a new chat is selected
     if (messageContainerRef.current) {
       messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
@@ -81,7 +115,7 @@ function Chats() {
     if (!message.trim()) return;
 
     try {
-      const response = await axiosInstance.post('/api/message/', {
+      const response = await axiosInstance.post('/api/messages/message/', {
         chat: selectedChat.id,
         sender: localStorage.getItem('username'),
         text: message,
@@ -111,7 +145,16 @@ function Chats() {
               className={`chat-item ${selectedChat?.id === chat.id ? 'selected' : ''}`}
               onClick={() => handleChatSelect(chat)}
             >
-              {chat.user}
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <img 
+                  src={chat.user_data.avatar} 
+                  alt="Аватар пользователя" 
+                  style={{ width: '50px', height: '50px', borderRadius: '50%' }} 
+                />
+                <div style={{ marginLeft: '10px' }}>
+                  <p>{chat.user_data.first_name} {chat.user_data.last_name}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -121,7 +164,10 @@ function Chats() {
               <div className="messages" ref={messageContainerRef}> {/* Assign the ref here */}
                 {messages.map((msg) => (
                   <div key={msg.id} className={`message ${msg.sender === localStorage.getItem('username') ? 'user' : 'other'}`}>
-                    <div className="bubble">{msg.text}</div>
+                    <div className="bubble">
+                      <p>{msg.text}</p>
+                      <p className="timestamp">{new Date(msg.created_at).toLocaleString()}</p>
+                    </div>
                   </div>
                 ))}
               </div>

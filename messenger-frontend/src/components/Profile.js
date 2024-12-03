@@ -12,7 +12,7 @@ function Profile() {
         const fetchUserData = async () => {
             try {
                 const username = localStorage.getItem('username')
-                const response = await axiosInstance.get(`/api/profile/?username=${username}`);
+                const response = await axiosInstance.get(`/api/accounts/profile/?username=${username}`);
                 setUserData(response.data[0]);
             } catch (error) {
                 console.error('Error fetching user data:', error);
