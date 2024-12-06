@@ -28,7 +28,6 @@ function Profile() {
     return (
         <div>
             <meta name="csrf-token" content={localStorage.getItem('csrf')}></meta>
-            <h1>Профиль</h1>
             {loading ? (
                 <p>Загрузка данных...</p>
             ) : error ? (

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from './axiosConfig';
@@ -9,12 +8,16 @@ function UserProfile() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isInContacts, setIsInContacts] = useState(false); // Состояние для отслеживания наличия в контактах
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         const response = await axiosInstance.get(`/api/accounts/profile/?username=${username}`);
         setUserData(response.data[0]);
+        // Проверяем, есть ли пользователь в контактах
+        const contactsResponse = await axiosInstance.get(`/api/accounts/contacts/check/?username=${localStorage.getItem('username')}&contact=${username}`);
+        setIsInContacts(contactsResponse.data.isInContacts);
       } catch (error) {
         console.error('Error fetching user data:', error);
         setError('Ошибка при загрузке данных пользователя.');
@@ -28,7 +31,7 @@ function UserProfile() {
 
   const handleGoToChat = async () => {
     try {
-      const response = await axiosInstance.post('/api/messages/chat/create_or_get_chat/', {
+      await axiosInstance.post('/api/messages/chat/create_or_get_chat/', {
         "user1": localStorage.getItem("username"),
         "user2": userData.username,
       });
@@ -39,9 +42,34 @@ function UserProfile() {
     }
   };
 
+  const handleAddToContacts = async () => {
+    try {
+      await axiosInstance.post('/api/accounts/contacts/', {
+        "contact": userData.username,
+        "username": localStorage.getItem('username')
+      });
+      setIsInContacts(true);
+    } catch (error) {
+      console.error('Error adding user to contacts:', error);
+      setError('Ошибка при добавлении пользователя в контакты.');
+    }
+  };
+
+  const handleRemoveFromContacts = async () => {
+    try {
+        await axiosInstance.delete('/api/accounts/contacts/', {data: {
+            "contact": userData.username,
+            "username": localStorage.getItem('username')
+          }});
+      setIsInContacts(false);
+    } catch (error) {
+      console.error('Error removing user from contacts:', error);
+      setError('Ошибка при удалении пользователя из контактов.');
+    }
+  };
+
   return (
     <div>
-      <h1>Профиль пользователя {username}</h1>
       {loading ? (
         <p>Загрузка данных...</p>
       ) : error ? (
@@ -61,6 +89,11 @@ function UserProfile() {
             </div>
           </div>
           <button onClick={handleGoToChat} style={{ marginTop: '20px' }}>Перейти в чат</button>
+          {isInContacts ? (
+            <button onClick={handleRemoveFromContacts} style={{ marginTop: '20px', marginLeft: '10px' }}>Удалить из контактов</button>
+          ) : (
+            <button onClick={handleAddToContacts} style={{ marginTop: '20px', marginLeft: '10px' }}>Добавить в контакты</button>
+          )}
         </div>
       ) : (
         <p>Данные пользователя не найдены.</p>

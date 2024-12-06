@@ -7,6 +7,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.decorators import action
+
 
 
 
@@ -72,7 +74,7 @@ class UserProfileViewSet(ModelViewSet):
 
 
 class ContactsViewSet(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         try:
@@ -83,7 +85,7 @@ class ContactsViewSet(APIView):
                 return Response(data=serializer_data.data, status=status.HTTP_200_OK)
         except:
             return Response(exception=True, status=status.HTTP_400_BAD_REQUEST)
-        
+
     
     def post(self, request, *args, **kwargs):
         try:
@@ -94,11 +96,37 @@ class ContactsViewSet(APIView):
         except User.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
         user.contacts.add(contact)
-        sereializer_data = UserSerializer(contact, context={'request': request})
+        sereializer_data = ContactSerializer(contact, context={'request': request})
         return Response(sereializer_data.data, status=status.HTTP_200_OK)
 
+    def delete(self, request, *args, **kwargs):
+        try:
+            print(request.data)
+            username = request.data.get('username')
+            contact = request.data.get('contact')
+            user = User.objects.get(username=username)
+            contact = User.objects.get(username=contact)
+        except User.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        user.contacts.remove(contact)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
+class ContactCheckView(APIView):
+    def get(self, request, *args, **kwargs):
+        try:
+            username = request.query_params.get('username')
+            contact = request.query_params.get('contact')
+            if not username or not contact:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
 
+            user = User.objects.get(username=username)
+            is_in_contacts = user.contacts.filter(username=contact).exists()
+            return Response(data={'isInContacts': is_in_contacts}, status=status.HTTP_200_OK)
+
+        except User.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class SearchApiView(APIView):

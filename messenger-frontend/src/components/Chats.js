@@ -1,10 +1,12 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axiosInstance from './axiosConfig';
 import '../App.css';
 import './Chats.css';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
+import Modal from 'react-modal';
+
+Modal.setAppElement('#root'); // Установите корневой элемент для модального окна
 
 function Chats() {
   const navigate = useNavigate();
@@ -14,6 +16,8 @@ function Chats() {
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState('');
   const [lastMessageId, setLastMessageId] = useState(null);
+  const [showContacts, setShowContacts] = useState(false);
+  const [contacts, setContacts] = useState([]);
 
   const messageContainerRef = useRef(null); // Create a ref for the message container
 
@@ -100,6 +104,19 @@ function Chats() {
     }
   }, [messages]);
 
+  // const handleScroll = useCallback((e) => {
+  //   if (showContacts) {
+  //     e.preventDefault();
+  //   }
+  // }, [showContacts]);
+
+  // useEffect(() => {
+  //   window.addEventListener('scroll', handleScroll, { passive: false });
+  //   return () => {
+  //     window.removeEventListener('scroll', handleScroll);
+  //   };
+  // }, [handleScroll]);
+
   const handleChatSelect = (chat) => {
     if (selectedChat?.id !== chat.id) {
       setSelectedChat(chat);
@@ -134,9 +151,85 @@ function Chats() {
     }
   };
 
+  const handleCreateNewChat = async () => {
+    try {
+      const username = localStorage.getItem('username');
+      const response = await axiosInstance.get(`/api/accounts/contacts/?username=${username}`);
+      const contactsWithNoChat = response.data.contacts;
+      setContacts(contactsWithNoChat);
+      setShowContacts(true);
+    } catch (error) {
+      console.error('Error fetching contacts:', error);
+    }
+  };
+
+  const handleContactSelect = async (contact) => {
+    try {
+      const response = await axiosInstance.post('/api/messages/chat/create_or_get_chat/', {
+        user1: localStorage.getItem('username'),
+        user2: contact.username,
+      });
+      setSelectedChat(response.data);
+      setShowContacts(false);
+    } catch (error) {
+      console.error('Error creating or getting chat:', error);
+    }
+  };
+
+
+
+  
+
   return (
     <div className="container">
       <h1>Чаты</h1>
+      <button onClick={handleCreateNewChat} style={{ marginBottom: '10px' }}>Создать новый чат</button>
+      <Modal
+        isOpen={showContacts}
+        onRequestClose={() => setShowContacts(false)}
+        contentLabel="Выбор контакта"
+        style={{
+          overlay: {
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            // pointerEvents: showContacts ? 'auto' : 'none', // Блокировка взаимодействия с задним фоном
+          },
+          content: {
+            width: '300px',
+            height: '400px',
+            margin: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            position: 'relative',
+          },
+        }}
+      >
+        <h2 style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+          Выберите контакт
+        </h2>
+        <div className="contacts-list" style={{ overflowY: 'auto', width: '100%', flex: '1' }}>
+          {contacts.map((contact) => (
+            <div
+              key={contact.username}
+              className="contact-item"
+              onClick={() => handleContactSelect(contact)}
+              style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', cursor: 'pointer' }}
+            >
+              <img 
+                src={contact.avatar} 
+                alt="Аватар пользователя" 
+                style={{ width: '50px', height: '50px', borderRadius: '50%' }} 
+              />
+              <div style={{ marginLeft: '10px' }}>
+                <p>{contact.first_name} {contact.last_name}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => setShowContacts(false)} style={{ width: '100%', padding: '10px', background: '#f44336', color: 'white', border: 'none', cursor: 'pointer' }}>
+          Отмена
+        </button>
+      </Modal>
       <div className="chat-container">
         <div className="chat-list">
           {chats.map((chat) => (
@@ -161,6 +254,20 @@ function Chats() {
         <div className="chat-window">
           {selectedChat ? (
             <>
+              <div 
+                className="user-profile" 
+                onClick={() => navigate(`/user/${selectedChat.user}`)}
+                style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '10px', borderBottom: '1px solid #ccc' }}
+              >
+                <img 
+                  src={selectedChat.user_data.avatar} 
+                  alt="Аватар пользователя" 
+                  style={{ width: '50px', height: '50px', borderRadius: '50%' }} 
+                />
+                <div style={{ marginLeft: '10px' }}>
+                  <p>{selectedChat.user_data.first_name} {selectedChat.user_data.last_name}</p>
+                </div>
+              </div>
               <div className="messages" ref={messageContainerRef}> {/* Assign the ref here */}
                 {messages.map((msg) => (
                   <div key={msg.id} className={`message ${msg.sender === localStorage.getItem('username') ? 'user' : 'other'}`}>
