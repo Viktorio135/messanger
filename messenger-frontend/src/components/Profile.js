@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from './axiosConfig';
 
+import './Profile.css'
+
 function Profile() {
     const navigate = useNavigate();
     const [userData, setUserData] = useState(null);

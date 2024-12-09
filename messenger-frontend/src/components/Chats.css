@@ -1,12 +1,15 @@
-
 .chat-container {
   display: flex;
+  height: 100%; /* Растягиваем на всю высоту родительского элемента */
+  width: 100%; /* Растягиваем на всю ширину родительского элемента */
 }
 
 .chat-list {
-  width: 30%;
+  width: 25%;
   border-right: 1px solid #ccc;
   padding: 10px;
+  height: 100%; /* Растягиваем на всю высоту родительского элемента */
+  overflow-y: auto;
 }
 
 .chat-item {
@@ -20,12 +23,15 @@
 }
 
 .chat-window {
-  width: 70%;
-  padding: 10px;
+  flex: 1; 
+  display: flex;
+  flex-direction: column;
+  background-color: #fff;
+  height: 100%;
 }
 
 .messages {
-  height: 400px;
+  height: 300px;
   overflow-y: auto;
   border: 1px solid #ccc;
   padding: 10px;

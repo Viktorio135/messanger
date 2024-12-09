@@ -17,11 +17,18 @@ class TextEventStreamRenderer(BaseRenderer):
 class ChatSerializer(serializers.ModelSerializer):
     user1 = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     user2 = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    last_message = serializers.SerializerMethodField()
 
 
     class Meta:
         model = Chat
-        fields = ('id', 'user1', 'user2')
+        fields = ('id', 'user1', 'user2', 'last_message')
+
+    def get_last_message(self, instance):
+        if Message.objects.filter(chat_id=instance.id).exists():
+            return Message.objects.filter(chat_id=instance.id).last().text
+        return None
+    
 
 
 

@@ -13,11 +13,12 @@ function Chats() {
   const [searchParams] = useSearchParams();
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const [messagesByChat, setMessagesByChat] = useState({}); // Состояние для хранения сообщений для каждого чата
   const [message, setMessage] = useState('');
   const [lastMessageId, setLastMessageId] = useState(null);
   const [showContacts, setShowContacts] = useState(false);
   const [contacts, setContacts] = useState([]);
+  const lastMessagesTextRef = useRef({});
 
   const messageContainerRef = useRef(null); // Create a ref for the message container
 
@@ -46,22 +47,43 @@ function Chats() {
   }, [navigate, searchParams]);
 
   useEffect(() => {
-    const fetchMessages = async () => {
-      if (selectedChat) {
-        try {
-          const response = await axiosInstance.get(`/api/messages/message/?chat=${selectedChat.id}`);
-          setMessages(response.data);
-          if (response.data.length > 0) {
-            setLastMessageId(response.data[response.data.length - 1].id);
-          }
-        } catch (error) {
-          console.error('Error fetching messages:', error);
-        }
+    const accessToken = localStorage.getItem('accessToken');
+    const username = localStorage.getItem('username');
+    const url = `http://localhost:8000/api/messages/chat/sse/${username}/`;
+
+    const controller = new AbortController();
+
+    const fetchSSE = async () => {
+      try {
+        await fetchEventSource(url, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          },
+          onmessage: (event) => {
+            const data = JSON.parse(event.data);
+            lastMessagesTextRef.current = data; // Обновляем состояние через useRef
+
+            setChats((prevChats) =>
+              prevChats.map((chat) => ({
+                ...chat,
+                last_message: lastMessagesTextRef.current[chat.id] || chat.last_message,
+              }))
+            );
+          },
+          signal: controller.signal,
+        });
+      } catch (error) {
+        console.error('Error with SSE connection:', error);
       }
     };
 
-    fetchMessages();
-  }, [selectedChat]);
+    fetchSSE(); // Вызов fetchSSE за пределами блока try
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
 
   useEffect(() => {
     if (selectedChat) {
@@ -79,7 +101,10 @@ function Chats() {
             },
             onmessage: (event) => {
               const data = JSON.parse(event.data);
-              setMessages((prevMessages) => [...prevMessages, data]);
+              setMessagesByChat((prevMessages) => ({
+                ...prevMessages,
+                [selectedChat.id]: [...(prevMessages[selectedChat.id] || []), data],
+              }));
               setLastMessageId(data.id);
             },
             signal: controller.signal,
@@ -102,25 +127,11 @@ function Chats() {
     if (messageContainerRef.current) {
       messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
     }
-  }, [messages]);
-
-  // const handleScroll = useCallback((e) => {
-  //   if (showContacts) {
-  //     e.preventDefault();
-  //   }
-  // }, [showContacts]);
-
-  // useEffect(() => {
-  //   window.addEventListener('scroll', handleScroll, { passive: false });
-  //   return () => {
-  //     window.removeEventListener('scroll', handleScroll);
-  //   };
-  // }, [handleScroll]);
+  }, [messagesByChat[selectedChat?.id]]);
 
   const handleChatSelect = (chat) => {
     if (selectedChat?.id !== chat.id) {
       setSelectedChat(chat);
-      setMessages([]); // Очищаем сообщения только при выборе нового чата
     }
     // Scroll to bottom when a new chat is selected
     if (messageContainerRef.current) {
@@ -138,7 +149,10 @@ function Chats() {
         text: message,
       });
 
-      setMessages([...messages, response.data]);
+      setMessagesByChat((prevMessages) => ({
+        ...prevMessages,
+        [selectedChat.id]: [...(prevMessages[selectedChat.id] || []), response.data],
+      }));
       setLastMessageId(response.data.id);
       setMessage('');
 
@@ -176,10 +190,6 @@ function Chats() {
     }
   };
 
-
-
-  
-
   return (
     <div className="container">
       <h1>Чаты</h1>
@@ -191,7 +201,6 @@ function Chats() {
         style={{
           overlay: {
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            // pointerEvents: showContacts ? 'auto' : 'none', // Блокировка взаимодействия с задним фоном
           },
           content: {
             width: '300px',
@@ -246,6 +255,7 @@ function Chats() {
                 />
                 <div style={{ marginLeft: '10px' }}>
                   <p>{chat.user_data.first_name} {chat.user_data.last_name}</p>
+                  <p>{chat.last_message}</p>
                 </div>
               </div>
             </div>
@@ -269,7 +279,7 @@ function Chats() {
                 </div>
               </div>
               <div className="messages" ref={messageContainerRef}> {/* Assign the ref here */}
-                {messages.map((msg) => (
+                {(messagesByChat[selectedChat.id] || []).map((msg) => (
                   <div key={msg.id} className={`message ${msg.sender === localStorage.getItem('username') ? 'user' : 'other'}`}>
                     <div className="bubble">
                       <p>{msg.text}</p>

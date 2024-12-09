@@ -1,5 +1,7 @@
 import json
 import time
+import hashlib
+
 
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
@@ -45,12 +47,47 @@ class ChatViewSet(ModelViewSet):
             chat_data = {
                 'id': chat['id'],
                 'user': user1 if username == user2 else user2,
+                'last_message': Message.objects.filter(chat_id=chat['id']).last().text if Message.objects.filter(chat_id=chat['id']).exists() else None
             }
             serializer_data = ProfileSerializer(User.objects.get(username=chat_data['user']), context={'request': request})
             chat_data['user_data'] = serializer_data.data
             modified_data.append(chat_data)
 
         return Response(modified_data)
+    
+    @action(detail=False, methods=['get'], url_path=r'sse/(?P<username>[a-zA-Z0-9-]+)', renderer_classes=[TextEventStreamRenderer])
+    def get_last_message(self, request, username):
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            Response(data={'error': 'User does not exist'}, status=status.HTTP_400_BAD_REQUEST)
+
+        def event_stream():
+            last_messages = None
+            while True:
+                chats = Chat.objects.filter(user1=user) | Chat.objects.filter(user2=user)
+                if chats.exists():
+                    data = {}
+                    for chat in chats:
+                        serializer = self.get_serializer(chat)
+                        data[serializer.data['id']] = serializer.data['last_message']
+                    
+                    new_messages = data
+                    
+                    # Отправляем данные только если они изменились
+                    if last_messages != new_messages:
+                        last_messages = new_messages
+                        yield f'data: {json.dumps(data)}\n\n'
+                
+                time.sleep(1)
+        response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+
+        return response
+
+
+
+        
+        
     
     @action(detail=False, methods=['post'])
     def create_or_get_chat(self, request):
@@ -83,7 +120,7 @@ class ChatViewSet(ModelViewSet):
 class MessageViewSet(ModelViewSet):
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['chat']
 
